@@ -52,7 +52,7 @@ body{
   body{padding:24px;background:#0d0f0e}
   #phone{height:912px;border-radius:44px;box-shadow:var(--sh-3),0 0 0 11px #17191a,0 0 0 13px #2c2f30}
 }
-#app{position:relative;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+#app{position:relative;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;overscroll-behavior-y:contain}
 #app::-webkit-scrollbar{width:0}
 .view{min-height:100%;display:flex;flex-direction:column;will-change:transform,opacity}
 .pad{padding:0 22px}
@@ -114,7 +114,7 @@ h1,h2,h3,h4{margin:0;color:var(--ink);letter-spacing:-.015em;font-weight:700}
 .stars{color:#F1B33C;letter-spacing:1px}
 .avatar{border-radius:50%;display:grid;place-items:center;font-family:var(--fb);font-weight:700;color:#fff;flex:0 0 auto;
   box-shadow:inset 0 0 0 3px rgba(255,255,255,.35),0 6px 16px rgba(35,43,38,.12);position:relative}
-.hscroll{display:flex;gap:14px;overflow-x:auto;padding:2px 22px 8px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.hscroll{display:flex;gap:14px;overflow-x:auto;padding:2px 22px 8px;scroll-snap-type:x mandatory;scroll-behavior:smooth;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .hscroll::-webkit-scrollbar{display:none}
 .hscroll>*{scroll-snap-align:start;flex:0 0 auto}
 
@@ -521,14 +521,31 @@ const SCREENS={};
 const SMART_PH=["I'm not sure what I need…","Help me choose a career","Prepare me for GATE","Someone to review my resume","I want to talk to a psychologist","A national-level badminton coach","Should I switch to product?"];
 
 /* splash */
-SCREENS.splash=()=>`<div class="view" style="justify-content:center;align-items:center;text-align:center;position:relative;overflow:hidden">
- <div class="blob float" style="width:190px;height:190px;background:var(--pink);top:15%;left:6%"></div>
- <div class="blob float" style="width:220px;height:220px;background:var(--green-light);top:20%;right:0;animation-delay:-3s"></div>
- <div class="blob float" style="width:150px;height:150px;background:var(--cream);bottom:16%;left:22%;animation-delay:-5s"></div>
- <div class="blob float" style="width:130px;height:130px;background:var(--green-mid);bottom:22%;right:16%;animation-delay:-1.5s"></div>
- <div style="position:relative;z-index:2" id="splashwrap">
-  <div class="logo" style="font-size:56px;letter-spacing:.05em">FREED</div>
-  <p class="lead" style="margin-top:14px">Talk to someone who knows.</p></div></div>`;
+SCREENS.splash=()=>`<div class="view" style="position:absolute;inset:0;overflow:hidden;background:var(--bg)">
+ <!-- calming wave header -->
+ <div style="position:absolute;top:0;left:0;right:0;height:63%;overflow:hidden;background:linear-gradient(165deg,#FFC9B8 0%,#FF9FAE 58%,#FF8DA1 100%);animation:fadeHead 1.1s var(--ease) both">
+  <svg width="100%" height="100%" viewBox="0 0 400 520" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;opacity:.18" fill="none" stroke="#fff" stroke-width="2">
+   <path d="M-30 90 C 90 40 210 130 440 70"/><path d="M-30 140 C 110 96 230 176 440 120"/><path d="M-30 200 C 90 150 250 230 440 175"/>
+   <path d="M-30 270 C 120 220 240 300 440 245"/><path d="M-30 340 C 90 300 260 370 440 320"/><path d="M-30 410 C 120 370 240 440 440 395"/>
+   <ellipse cx="300" cy="150" rx="70" ry="46" transform="rotate(-18 300 150)"/><ellipse cx="300" cy="150" rx="42" ry="26" transform="rotate(-18 300 150)"/>
+   <ellipse cx="90" cy="300" rx="60" ry="40" transform="rotate(12 90 300)"/>
+  </svg>
+  <div style="position:absolute;top:32%;left:0;right:0;text-align:center;color:#fff;animation:riseIn 1s var(--ease) .25s both">
+   <div class="logo" style="font-size:54px;letter-spacing:.06em;color:#fff">FREED</div>
+   <div style="font-size:13.5px;font-weight:600;letter-spacing:.04em;opacity:.92;margin-top:8px">Talk to someone who knows.</div>
+  </div>
+  <svg viewBox="0 0 400 96" preserveAspectRatio="none" style="position:absolute;bottom:-1px;left:0;width:100%;height:96px"><path d="M0 46 C 120 96 250 8 400 48 L400 96 L0 96 Z" fill="var(--bg)"/></svg>
+ </div>
+ <!-- content -->
+ <div style="position:absolute;bottom:0;left:0;right:0;padding:0 30px calc(38px + env(safe-area-inset-bottom));animation:riseIn 1s var(--ease) .45s both">
+  <h1 class="d1" style="font-size:34px">Free yourself.</h1>
+  <p class="lead" style="margin-top:11px;max-width:300px">Whatever you're figuring out, you don't have to figure it out alone. Take one step — with someone who's been there.</p>
+  <div class="between" style="margin-top:28px">
+   <span class="tiny dim">One step towards what you want</span>
+   <button class="btn btn-pink" data-getstarted style="width:62px;height:62px;border-radius:50%;padding:0">${ic("arrow",24)}</button>
+  </div>
+ </div>
+ <style>@keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes fadeHead{from{opacity:0}to{opacity:1}}</style></div>`;
 
 /* onboarding */
 const ONB=[
@@ -560,17 +577,25 @@ SCREENS.intent=()=>`<div class="view pad gap-cta" style="padding-top:20px">
  <div class="ctabar"><button class="btn btn-soft btn-block" data-go="login">Skip for now</button></div></div>`;
 
 /* login */
-SCREENS.login=()=>`<div class="view pad" style="padding-top:28px;padding-bottom:28px">
- <div class="grow" style="display:flex;flex-direction:column;justify-content:center;gap:8px">
-  <div class="logo" style="font-size:36px" data-stagger>FREED</div>
-  <h1 class="d1" style="margin-top:14px" data-stagger>Talk to someone<br>who knows.</h1>
-  <p class="lead" data-stagger style="margin-top:6px">Sign in — we only ask what we really need.</p></div>
- <div class="stack" style="margin-bottom:8px">
-  <button class="btn btn-ghost btn-block btn-lg" data-login="Google" data-stagger><b style="font-family:var(--fl);font-weight:700">G</b> Continue with Google</button>
-  <button class="btn btn-dark btn-block btn-lg" data-login="Apple" data-stagger> Continue with Apple</button>
-  <button class="btn btn-ghost btn-block btn-lg" data-login="phone" data-stagger>${ic("phone",18)} Continue with phone</button>
-  <button class="btn btn-ghost btn-block btn-lg" data-login="email" data-stagger>${ic("chat",18)} Continue with email</button></div>
- <p class="tiny dim center" style="margin-top:14px;line-height:1.5">Secure, encrypted sign-in · Terms & Privacy</p></div>`;
+SCREENS.login=()=>`<div class="view" style="position:absolute;inset:0;overflow:hidden;background:var(--bg)">
+ <div style="position:absolute;top:0;left:0;right:0;height:34%;overflow:hidden;background:linear-gradient(165deg,#FFC9B8,#FF9FAE 70%,#FF8DA1)">
+  <svg width="100%" height="100%" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;opacity:.16" fill="none" stroke="#fff" stroke-width="2">
+   <path d="M-30 70 C 110 30 230 110 440 55"/><path d="M-30 130 C 90 90 260 160 440 110"/><path d="M-30 190 C 120 150 240 220 440 175"/>
+   <ellipse cx="310" cy="90" rx="60" ry="38" transform="rotate(-16 310 90)"/></svg>
+  <div style="position:absolute;left:30px;bottom:34px;color:#fff"><div class="logo" style="font-size:30px;color:#fff">FREED</div></div>
+  <svg viewBox="0 0 400 70" preserveAspectRatio="none" style="position:absolute;bottom:-1px;left:0;width:100%;height:70px"><path d="M0 34 C 130 74 250 4 400 36 L400 70 L0 70 Z" fill="var(--bg)"/></svg>
+ </div>
+ <div style="position:absolute;top:34%;left:0;right:0;bottom:0;padding:16px 30px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column">
+  <h1 class="d1" style="margin-top:6px" data-stagger>Welcome</h1>
+  <p class="lead" data-stagger style="margin-top:6px;margin-bottom:20px">Sign in — we only ask what we really need.</p>
+  <div class="stack" style="margin-bottom:8px">
+   <button class="btn btn-ghost btn-block btn-lg" data-login="Google" data-stagger><b style="font-family:var(--fl);font-weight:700">G</b> Continue with Google</button>
+   <button class="btn btn-dark btn-block btn-lg" data-login="Apple" data-stagger> Continue with Apple</button>
+   <button class="btn btn-ghost btn-block btn-lg" data-login="phone" data-stagger>${ic("phone",18)} Continue with phone</button>
+   <button class="btn btn-ghost btn-block btn-lg" data-login="email" data-stagger>${ic("chat",18)} Continue with email</button></div>
+  <div class="grow"></div>
+  <p class="tiny dim center" style="line-height:1.5">Secure, encrypted sign-in · Terms &amp; Privacy</p>
+ </div></div>`;
 
 /* home — smart, dynamic, alive */
 function greeting(){const h=new Date().getHours();return h<12?"Good morning":h<17?"Good afternoon":"Good evening";}
@@ -984,15 +1009,16 @@ function confirmBooking(){const b=state.booking,e=byId(b.expertId);state.payCtx=
    EVENTS
    ========================================================================== */
 document.addEventListener("click",e=>{
- const t=e.target.closest("[data-back],[data-go],[data-onbnext],[data-onbskip],[data-intent],[data-login],[data-dologin],[data-opensearch],[data-sugg],[data-find],[data-match],[data-vert],[data-need],[data-fil],[data-filters],[data-sortopen],[data-sort],[data-apply],[data-expert],[data-talk],[data-talknow],[data-book],[data-service],[data-startmode],[data-accept],[data-cc],[data-endcall],[data-day],[data-slot],[data-dur],[data-confirmbk],[data-paymethod],[data-pay],[data-openchat],[data-send],[data-star],[data-useful],[data-rtag],[data-again],[data-submitreview],[data-bktab],[data-join],[data-reschedule],[data-cancel],[data-doconcancel],[data-summary],[data-rate],[data-become],[data-expnext],[data-expback],[data-availtoggle],[data-emode],[data-adminsec],[data-adminrev],[data-adminaction],[data-dbrev],[data-dbaction],[data-quickask],[data-doquickask],[data-group],[data-reservegroup],[data-guide],[data-report],[data-dosreport],[data-doblock],[data-editprofile],[data-pfintent],[data-saveprofile],[data-logout],[data-toast],[data-noop],[data-closesheet]");
+ const t=e.target.closest("[data-back],[data-go],[data-getstarted],[data-onbnext],[data-onbskip],[data-intent],[data-login],[data-dologin],[data-opensearch],[data-sugg],[data-find],[data-match],[data-vert],[data-need],[data-fil],[data-filters],[data-sortopen],[data-sort],[data-apply],[data-expert],[data-talk],[data-talknow],[data-book],[data-service],[data-startmode],[data-accept],[data-cc],[data-endcall],[data-day],[data-slot],[data-dur],[data-confirmbk],[data-paymethod],[data-pay],[data-openchat],[data-send],[data-star],[data-useful],[data-rtag],[data-again],[data-submitreview],[data-bktab],[data-join],[data-reschedule],[data-cancel],[data-doconcancel],[data-summary],[data-rate],[data-become],[data-expnext],[data-expback],[data-availtoggle],[data-emode],[data-adminsec],[data-adminrev],[data-adminaction],[data-dbrev],[data-dbaction],[data-quickask],[data-doquickask],[data-group],[data-reservegroup],[data-guide],[data-report],[data-dosreport],[data-doblock],[data-editprofile],[data-pfintent],[data-saveprofile],[data-logout],[data-toast],[data-noop],[data-closesheet]");
  if(!t)return;const d=t.dataset;haptic(6);
  if("back" in d)return back();
  if(d.go)return go(d.go==="stub"?"stub":d.go);
  if("toast" in d)return toast(d.toast);
  if("noop" in d){t.classList.toggle("on");return;}
  if("closesheet" in d)return closeSheet();
- if("onbnext" in d){if(state.onb<2){state.onb++;renderNow(true);}else go("intent");return;}
- if("onbskip" in d)return go("intent");
+ if("getstarted" in d)return go("login");
+ if("onbnext" in d){if(state.onb<ONB.length-1){state.onb++;renderNow(true);}else go("login");return;}
+ if("onbskip" in d)return go("login");
  if(d.intent){state.user.intent=d.intent;store.set("user",state.user);go("login");return;}
  if(d.login){if(d.login==="Google"||d.login==="Apple"){if(state.user.name==="there")state.user.name="Alex";store.set("user",state.user);toast("Signed in with "+d.login);go("home",{replace:true});}else openSheet(loginSheet(d.login));return;}
  if("dologin" in d){const v=$("#login-input")?.value?.trim();closeSheet();if(state.user.name==="there")state.user.name="Alex";store.set("user",state.user);toast("Welcome to FREED");go("home",{replace:true});return;}
@@ -1063,7 +1089,7 @@ document.addEventListener("click",e=>{
 /* ==========================================================================
    BOOT
    ========================================================================== */
-function boot(){renderNow(false);FDB.init();setTimeout(()=>{if(state.screen==="splash"){state.onb=0;go("onboarding",{replace:true});}},2100);}
+function boot(){renderNow(false);FDB.init();}
 boot();
 })();
 </script>
