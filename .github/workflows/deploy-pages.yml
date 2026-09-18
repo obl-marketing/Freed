@@ -1,0 +1,51 @@
+# Publishes the FREED prototype (prototype/freed.html) to GitHub Pages.
+# Result: a public URL like https://<owner>.github.io/<repo>/ — usable
+# anywhere, hosted from this repo, with no dependency on Claude.
+# Note: the Pages build serves a purely static page, so the in-browser
+# shared database (which only exists inside claude.ai) is not present here;
+# the prototype runs on in-memory data. For a public app WITH a database,
+# deploy the backend (see DEPLOY.md).
+name: Deploy prototype to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'prototype/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble static site
+        run: |
+          mkdir -p _site
+          cp prototype/freed.html _site/index.html
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
