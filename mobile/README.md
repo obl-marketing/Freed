@@ -37,5 +37,9 @@ Trust Profile, availability states and "why this person" reasons. Bookings /
 Messages / Profile are stubs to fill in next — the fully-designed reference for
 every screen is [`../prototype/freed.html`](../prototype/freed.html).
 
-Fonts: add `@expo-google-fonts/unbounded` and `@expo-google-fonts/inter` and
-load them in `_layout.tsx` to match the prototype's typography.
+Fonts: `@expo-google-fonts/plus-jakarta-sans` (headings + body) and
+`@expo-google-fonts/unbounded` (FREED wordmark only) — load them in
+`_layout.tsx`. Plus Jakarta Sans is a soft, humanist sans chosen to feel modern
+yet relaxing; see `src/theme.ts` for the spacing rules (tight headers, airy
+body, roomy buttons, never all-caps). Premium option: Satoshi via Fontshare —
+bundle the .otf with expo-font and point `font.display`/`font.body` at it.
