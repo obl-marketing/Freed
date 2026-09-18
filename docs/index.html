@@ -125,18 +125,21 @@ h1,h2,h3,h4{margin:0;color:var(--ink);letter-spacing:-.015em;font-weight:700}
 .avail{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--avail);letter-spacing:0}
 
 /* topbar / nav */
-.topbar{position:sticky;top:0;z-index:20;padding:16px 22px 10px;display:flex;align-items:center;gap:12px;
-  background:linear-gradient(var(--bg) 72%,transparent)}
+/* sticky header — solid, gains a soft elevation as content scrolls under it */
+.topbar{position:sticky;top:0;z-index:20;padding:16px 22px 12px;display:flex;align-items:center;gap:12px;
+  background:var(--bg);transition:box-shadow .3s,border-color .3s;border-bottom:1px solid transparent}
+.topbar.scrolled{border-bottom-color:var(--line);box-shadow:0 8px 22px -16px rgba(35,43,38,.5)}
 .topbar.solid{background:var(--glass);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
-.nav{position:absolute;left:0;right:0;bottom:0;z-index:40;display:flex;padding:10px 8px calc(10px + env(safe-area-inset-bottom));
-  background:var(--glass);backdrop-filter:blur(22px);border-top:1px solid var(--line)}
-.nav button{flex:1;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;
-  padding:5px 0;color:var(--ink3);font-size:10.5px;font-weight:600;letter-spacing:0;transition:color .2s}
-.nav button.on{color:var(--ink)}
-.nav .ic{transition:transform .3s var(--ease-spring)}
-.nav button.on .ic{transform:translateY(-2px)}
-.nav .pip{width:5px;height:5px;border-radius:50%;background:var(--green);opacity:0;transform:scale(0);transition:.3s var(--ease-spring)}
-.nav button.on .pip{opacity:1;transform:scale(1)}
+/* sticky bottom nav — pill active state, springs on tab change (green = action) */
+.nav{position:absolute;left:0;right:0;bottom:0;z-index:40;display:flex;padding:8px 8px calc(9px + env(safe-area-inset-bottom));
+  background:var(--glass);backdrop-filter:blur(22px);border-top:1px solid var(--line);box-shadow:0 -6px 22px -14px rgba(35,43,38,.16)}
+.nav button{flex:1;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:3px 0;color:var(--ink3);font-size:10.5px;font-weight:600;letter-spacing:0;transition:color .25s}
+.nav .ic{width:54px;height:32px;border-radius:999px;display:grid;place-items:center;color:inherit;transition:background .3s var(--ease),color .25s,transform .2s var(--ease-spring)}
+.nav button:active .ic{transform:scale(.86)}
+.nav button.on{color:var(--green-deep)}
+.nav button.on .ic{background:var(--green-light);color:var(--green-deep);animation:navpop .5s var(--ease-spring)}
+@keyframes navpop{0%{transform:scale(.7)}55%{transform:scale(1.14)}100%{transform:scale(1)}}
 .ctabar{position:absolute;left:0;right:0;bottom:0;z-index:45;padding:14px 22px calc(16px + env(safe-area-inset-bottom));
   background:linear-gradient(transparent,var(--bg) 34%);display:flex;gap:10px}
 
@@ -395,7 +398,7 @@ const FDB=(function(){
  return{init,store:s,get ready(){return isReady;},
   addApplication:a=>add("applications",{...a,status:"Pending"}),
   setApp:(id,st)=>{if(!db)return;try{db.doc("applications/"+id).update({status:st}).catch(()=>{});}catch(e){}},
-  addReview:r=>add("reviews",r),addBooking:b=>add("bookings",b),
+  addReview:r=>add("reviews",r),addBooking:b=>add("bookings",b),addFeedback:f=>add("feedback",f),
   community:id=>{const a=s.reviewAgg[id];return a&&a.n?{avg:a.sum/a.n,n:a.n}:null;}};
 })();
 
@@ -417,7 +420,13 @@ const state={
   {id:"b1",expertId:6,date:"Wed, 24 Sep",time:"10:30 AM",dur:"30 min",amount:byId(6)?.s30||799,status:"upcoming",mode:"video"},
   {id:"b0",expertId:14,date:"Mon, 8 Sep",time:"6:00 PM",dur:"45 min",amount:1199,status:"past",mode:"audio",rated:false}
  ],
- recent:store.get("recent")||[]
+ recent:store.get("recent")||[],
+ saved:store.get("saved")||[],
+ prefs:store.get("prefs")||{lang:"English",notify:true,recording:false},
+ feed:0,
+ expServices:store.get("expServices")||[{t:"Instant chat",u:"/min",p:20},{t:"30 min session",u:"",p:499},{t:"Mock interview",u:"",p:999}],
+ expSlots:["Weekday evenings"],
+ expRequests:[{id:"r1",name:"A student",topic:"GATE CSE — where to start",mode:"chat",when:"now"},{id:"r2",name:"Working professional",topic:"Switching to Product",mode:"video",when:"in 10 min"}]
 };
 
 /* ==========================================================================
@@ -445,7 +454,7 @@ function typewriter(input,phrases){
 /* ==========================================================================
    ROUTER (animated)
    ========================================================================== */
-const NAVS={home:1,explore:1,bookings:1,messages:1,profile:1};
+const NAVS={home:1,explore:1,bookings:1,messages:1,userprofile:1};
 function go(screen,{replace=false,dir=1}={}){
  if(!replace&&state.screen&&state.screen!==screen)state.history.push(state.screen);
  state._dir=dir;state.screen=screen;if(NAVS[screen])state.tab=screen;renderNow(true);
@@ -456,7 +465,10 @@ function renderNow(transition){
  const fn=SCREENS[state.screen]||SCREENS.home;
  const dir=state._dir||1;
  const html=`<div class="view">${fn()}</div>`;
- app.innerHTML=html;navSlot.innerHTML=NAVS[state.screen]?navBar():"";
+ app.innerHTML=html;
+ // rebuild the nav only when the tab changes, so its spring fires on tab taps (not every in-tab re-render)
+ if(NAVS[state.screen]){if(navSlot.getAttribute("data-tab")!==state.screen){navSlot.innerHTML=navBar();navSlot.setAttribute("data-tab",state.screen);}}
+ else{navSlot.innerHTML="";navSlot.removeAttribute("data-tab");}
  app.scrollTop=0;
  const v=app.firstElementChild;
  if(transition&&!reduce){
@@ -469,15 +481,21 @@ function bindMount(v){
  $$(".btn",v).forEach(b=>{b.addEventListener("pointerdown",e=>{if(reduce)return;const r=b.getBoundingClientRect(),sz=Math.max(r.width,r.height);const s=document.createElement("span");s.className="ripple";s.style.width=s.style.height=sz+"px";s.style.left=(e.clientX-r.left-sz/2)+"px";s.style.top=(e.clientY-r.top-sz/2)+"px";b.appendChild(s);setTimeout(()=>s.remove(),600);});});
  $$("[data-count]",v).forEach(countUp);
  const ph=$("#smartph",v); if(ph)typewriter(ph,SMART_PH);
- const hs=$("[data-hero]",v); // parallax hero blobs on scroll
- if(hs){app.addEventListener("scroll",()=>{const y=app.scrollTop;$$(".blob",hs).forEach((b,i)=>{b.style.transform=`translateY(${y*(0.04+i*0.02)}px)`;});},{passive:true});}
+ onScroll(); // set initial header state for the freshly mounted screen
 }
+// one persistent scroll handler (no per-render leaks): header elevation + hero parallax
+function onScroll(){
+ const y=app.scrollTop;
+ const tb=app.querySelector(".topbar"); if(tb) tb.classList.toggle("scrolled",y>4);
+ const hero=app.querySelector("[data-hero]"); if(hero) hero.querySelectorAll(".blob").forEach((b,i)=>{b.style.transform=`translateY(${y*(0.04+i*0.02)}px)`;});
+}
+app.addEventListener("scroll",onScroll,{passive:true});
 
 /* ==========================================================================
    SHARED UI
    ========================================================================== */
-function navBar(){const items=[["home","Home","home"],["explore","Explore","compass"],["bookings","Bookings","cal"],["messages","Messages","chat"],["profile","Profile","user"]];
- return `<nav class="nav">${items.map(([k,l,i])=>`<button data-go="${k}" class="${state.tab===k?'on':''}"><span class="ic">${ic(i,23)}</span><span>${l}</span><span class="pip"></span></button>`).join("")}</nav>`;}
+function navBar(){const items=[["home","Home","home"],["explore","Explore","compass"],["bookings","Bookings","cal"],["messages","Messages","chat"],["userprofile","Profile","user"]];
+ return `<nav class="nav">${items.map(([k,l,i])=>`<button data-go="${k}" class="${state.tab===k?'on':''}"><span class="ic">${ic(i,23,1.9)}</span><span>${l}</span></button>`).join("")}</nav>`;}
 function avatarEl(e,sz=52){const ini=e.name.split(" ").map(w=>w[0]).slice(0,2).join("");
  return `<div class="avatar" style="width:${sz}px;height:${sz}px;font-size:${sz*.36}px;background:linear-gradient(135deg,${av(e.seed)})">${ini}${e.avail==="now"?`<span style="position:absolute;right:-1px;bottom:-1px;width:${sz*.28}px;height:${sz*.28}px;border-radius:50%;background:var(--avail);border:2.5px solid #fff"></span>`:""}</div>`;}
 function classBadge(e){const b=CLASS[e.badge];return `<span class="badge ${b.c}">${ic("check",12)}${b.t}</span>`;}
@@ -642,6 +660,14 @@ SCREENS.home=()=>{
 
   <div class="pad" style="margin-top:26px"><h3 class="h2" style="margin-bottom:14px" data-stagger>How FREED works</h3>
    ${[["1","Tell us what you need","In your own words — no categories to learn."],["2","Find the right person","We match you with people who fit your problem."],["3","Talk now or book later","Instant call, or a time that suits you."]].map(([n,t,s])=>`<div class="row" style="margin-bottom:14px;align-items:flex-start" data-stagger><div class="num" style="width:36px;height:36px;border-radius:50%;background:var(--cream);display:grid;place-items:center;flex:0 0 auto">${n}</div><div><b>${t}</b><div class="small muted">${s}</div></div></div>`).join("")}</div>
+
+  <div class="pad" style="margin-top:26px" data-stagger>
+   <div class="card" style="padding:18px;background:linear-gradient(140deg,var(--pink-soft),#fff)">
+    <div class="row" style="gap:10px;margin-bottom:4px"><div style="width:38px;height:38px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--pink)">${ic("heart",19)}</div><div><b>Help us make FREED better</b><div class="tiny dim">Your thoughts shape what we build next.</div></div></div>
+    <div style="font-size:30px;letter-spacing:6px;margin:12px 0 4px" id="feedstars">${[1,2,3,4,5].map(n=>`<span data-feedstar="${n}" style="color:${n<=(state.feed||0)?'#F1B33C':'#E5E0D4'};cursor:pointer;transition:transform .2s var(--ease-spring);display:inline-block;transform:scale(${n<=(state.feed||0)?1.1:1})">★</span>`).join("")}</div>
+    <textarea class="field" id="feedtext" rows="2" placeholder="What do you love? What's missing?" style="margin-top:8px"></textarea>
+    <button class="btn btn-primary btn-block" style="margin-top:12px" data-sendfeedback>Send feedback</button>
+   </div></div>
   <div style="height:26px"></div></div>`;};
 function pickForIntent(intent){
  const map={"A big decision":["career","exams"],"Some direction":["career","wellbeing"],"To level up a skill":["teaching","sports"],"Someone to talk to":["wellbeing"],"To build something":["career"],"Just exploring":null};
@@ -731,7 +757,7 @@ SCREENS.explore=()=>{const ex=state.explore;
 /* expert profile */
 SCREENS.profile=()=>{const e=byId(state.expertId);if(!e)return SCREENS.home();const v=e.verified,a=availView(e);const com=FDB.community(e.id);
  return `<div class="view gap-cta">
-  <div class="topbar solid" style="justify-content:space-between"><button class="iconbtn" data-back>${ic("back",20)}</button><div class="row"><button class="iconbtn" data-toast="Saved to your list">${ic("heart",19)}</button><button class="iconbtn" data-report="${e.id}">${ic("info",19)}</button></div></div>
+  <div class="topbar solid" style="justify-content:space-between"><button class="iconbtn" data-back>${ic("back",20)}</button><div class="row"><button class="iconbtn" data-save="${e.id}" style="${state.saved.includes(e.id)?'color:var(--pink);border-color:var(--pink-soft);background:var(--pink-soft)':''}">${ic("heart",19)}</button><button class="iconbtn" data-report="${e.id}">${ic("info",19)}</button></div></div>
   <div class="pad center" style="padding-top:6px"><div data-stagger>${avatarEl(e,94)}</div>
    <h1 class="d1" style="margin:14px 0 2px" data-stagger>${esc(e.name)}</h1>
    <div class="wrap" style="justify-content:center;margin:6px 0" data-stagger>${classBadge(e)}</div>
@@ -870,20 +896,49 @@ SCREENS.chat=()=>{const e=byId(state.expertId);if(!e)return SCREENS.messages();
   <div class="composer"><button class="iconbtn" data-toast="Attach a document or image">${ic("plus",20)}</button><textarea id="msg" class="field" rows="1" placeholder="Message ${esc(e.name.split(" ")[0])}…" style="min-height:46px;border-radius:23px;padding:12px 15px"></textarea><button class="iconbtn" style="background:var(--green);color:#0c2a12;border:0" data-send>${ic("send",18)}</button></div></div>`;};
 
 /* profile (user) */
-SCREENS.userprofile=()=>`<div class="view gap-nav"><div class="topbar" style="padding-top:18px"><div class="grow"><h2 class="h2">Profile</h2></div><button class="iconbtn" data-go="help">${ic("shield",19)}</button></div>
- <div class="pad"><div class="card row" data-stagger style="padding:18px"><div class="avatar" style="width:62px;height:62px;font-size:22px;background:linear-gradient(135deg,var(--pink),var(--green-mid))">${(state.user.name[0]||"Y").toUpperCase()}</div><div class="grow"><b style="font-size:17px">Hey, ${esc(state.user.name)}</b><div class="tiny dim">${state.user.intent?"Here for: "+esc(state.user.intent.toLowerCase()):"Tap to complete your profile"}</div></div><button class="iconbtn" data-editprofile>${ic("edit",18)}</button></div>
-  <div class="card" data-stagger style="margin-top:16px;padding:6px 16px">${[["cal","My bookings","bookings"],["chat","Messages","messages"],["wallet","Payments & refunds","stub"],["heart","Saved experts","stub"],["shield","Trust & safety","help"],["bell","Notifications","notifications"]].map(([i,l,g])=>`<button class="tickrow" data-go="${g}" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left">${ic(i,18)}<b class="small grow">${l}</b>${ic("chevr",16)}</button>`).join("")}</div>
-  <div class="card" data-stagger style="margin-top:16px;padding:18px;background:linear-gradient(120deg,var(--cream),#fff)"><div class="row"><div style="font-size:26px">🌱</div><div class="grow"><b>Share your expertise</b><div class="tiny dim">Help others and earn on FREED.</div></div></div><button class="btn btn-dark btn-block" style="margin-top:14px" data-become>Become an expert</button></div>
-  <div class="card" data-stagger style="margin-top:16px;padding:6px 16px"><button class="tickrow" data-go="admin" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left">${ic("gear",18)}<b class="small grow">Admin panel (demo)</b>${ic("chevr",16)}</button><button class="tickrow" data-logout style="width:100%;background:none;border:0;cursor:pointer;text-align:left;color:var(--danger)">${ic("logout",18)}<b class="small grow">Log out</b></button></div>
-  <div class="tiny dim center" style="margin-top:18px">FREED · Talk to someone who knows.</div></div><div style="height:22px"></div></div>`;
+SCREENS.userprofile=()=>{
+ const past=state.bookings.filter(b=>b.status==="past").length;
+ const spent=state.bookings.filter(b=>b.status!=="cancelled").reduce((s,b)=>s+(b.amount||0),0);
+ return `<div class="view gap-nav"><div class="topbar" style="padding-top:18px"><div class="grow"><h2 class="h2">Profile</h2></div><button class="iconbtn" data-settings>${ic("gear",19)}</button></div>
+ <div class="pad">
+  <div class="card" data-stagger style="padding:18px">
+   <div class="row"><div class="avatar" style="width:64px;height:64px;font-size:23px;background:linear-gradient(135deg,var(--pink),var(--green-mid))">${(state.user.name[0]||"Y").toUpperCase()}</div>
+    <div class="grow"><b style="font-size:18px">${state.user.name==="there"?"Complete your profile":esc(state.user.name)}</b><div class="tiny dim">${state.user.intent?"Here for "+esc(state.user.intent.toLowerCase()):"Tap edit to personalize FREED"}</div>${state.isExpert?`<span class="badge b-verify" style="margin-top:7px">${ic("check",11)} Expert</span>`:""}</div>
+    <button class="iconbtn" data-editprofile>${ic("edit",18)}</button></div>
+   <div class="row" style="margin-top:15px;border-top:1px solid var(--line);padding-top:14px">
+    ${[[past,"Sessions",0],[state.saved.length,"Saved",0],[spent,"Spent",1]].map(([n,l,r])=>`<div class="grow center"><div class="num" style="font-size:18px">${r?rupee(n):n}</div><div class="tiny dim">${l}</div></div>`).join('<div style="width:1px;height:30px;background:var(--line)"></div>')}</div>
+  </div>
+  <div class="eyebrow" data-stagger style="margin:22px 2px 10px">Account</div>
+  <div class="card" data-stagger style="padding:6px 16px">${[["cal","My bookings","bookings"],["chat","Messages","messages"],["heart","Saved experts","saved"],["wallet","Payments & refunds","payments"],["bell","Notifications","notifications"]].map(([i,l,g])=>`<button class="tickrow" data-go="${g}" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left">${ic(i,18)}<b class="small grow">${l}</b>${ic("chevr",16)}</button>`).join("")}</div>
+  <div class="eyebrow" data-stagger style="margin:22px 2px 10px">Preferences &amp; safety</div>
+  <div class="card" data-stagger style="padding:6px 16px">
+   <button class="tickrow" data-settings style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left">${ic("gear",18)}<b class="small grow">Settings</b>${ic("chevr",16)}</button>
+   <button class="tickrow" data-go="help" style="width:100%;background:none;border:0;cursor:pointer;text-align:left">${ic("shield",18)}<b class="small grow">Trust, safety &amp; help</b>${ic("chevr",16)}</button></div>
+  <div class="card" data-stagger style="margin-top:16px;padding:18px;background:linear-gradient(120deg,var(--cream),#fff)"><div class="row"><div style="width:42px;height:42px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--green-deep)">${ic("briefcase",21)}</div><div class="grow"><b>${state.isExpert?"You're an expert":"Share your expertise"}</b><div class="tiny dim">${state.isExpert?"Manage your practice & earnings.":"Help others and earn on FREED."}</div></div></div><button class="btn ${state.isExpert?'btn-primary':'btn-dark'} btn-block" style="margin-top:14px" ${state.isExpert?'data-go="expertdash"':'data-become'}>${state.isExpert?"Open Expert mode":"Become an expert"}</button></div>
+  <div class="card" data-stagger style="margin-top:16px;padding:6px 16px"><button class="tickrow" data-go="admin" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left">${ic("chart",18)}<b class="small grow">Admin panel (demo)</b>${ic("chevr",16)}</button><button class="tickrow" data-logout style="width:100%;background:none;border:0;cursor:pointer;text-align:left;color:var(--danger)">${ic("logout",18)}<b class="small grow">Log out</b></button></div>
+  <div class="tiny dim center" style="margin-top:18px">FREED · Talk to someone who knows.</div></div><div style="height:22px"></div></div>`;};
+
+/* payments & saved (real, functional) */
+SCREENS.payments=()=>{const tx=state.bookings.filter(b=>b.status!=="cancelled");
+ return `<div class="view">${header("Payments & refunds",{solid:true})}
+  <div class="pad"><div class="card" data-stagger style="padding:18px;background:linear-gradient(140deg,var(--green-light),#fff)"><div class="tiny" style="color:#2c5b30;font-weight:600">Total spent on FREED</div><div class="num" style="font-size:28px;margin-top:4px">${rupee(tx.reduce((s,b)=>s+(b.amount||0),0))}</div></div>
+   <div class="eyebrow" data-stagger style="margin:20px 2px 10px">Transactions</div>
+   <div class="stack-s">${tx.length?tx.map(b=>{const e=byId(b.expertId);return `<div class="card row" data-stagger style="padding:14px">${avatarEl(e,40)}<div class="grow"><b class="small">${esc(e.name)}</b><div class="tiny dim">${b.dur} · ${b.date}</div></div><div class="center"><b class="num">${rupee(b.amount)}</b><div class="tiny" style="color:var(--avail)">Paid</div></div></div>`;}).join(""):`<div class="tiny dim center" style="padding:30px">No transactions yet.</div>`}</div>
+   <div class="eyebrow" data-stagger style="margin:22px 2px 10px">Refunds &amp; disputes</div>
+   <div class="card" data-stagger style="padding:16px"><div class="tiny dim" style="line-height:1.5">Cancel an upcoming session for a full refund to your original method. Disputes are reviewed within 3 days.</div><button class="btn btn-ghost btn-block" style="margin-top:12px" data-toast="Refund request started — demo">Request a refund</button></div>
+   <div style="height:22px"></div></div></div>`;};
+SCREENS.saved=()=>{const list=state.saved.map(byId).filter(Boolean);
+ return `<div class="view">${header("Saved experts",{solid:true})}
+  <div class="pad ${list.length?'stack':''}">${list.length?list.map(ecardWide).join(""):`<div class="card center" data-stagger style="padding:44px 20px"><div style="width:58px;height:58px;border-radius:50%;background:var(--pink-soft);display:grid;place-items:center;color:var(--pink);margin:0 auto">${ic("heart",26)}</div><b style="margin-top:12px;display:block">No saved experts yet</b><div class="tiny dim" style="margin-top:6px">Tap the heart on any profile to keep them here.</div><button class="btn btn-soft" style="margin-top:16px" data-go="explore">Explore experts</button></div>`}</div><div style="height:22px"></div></div>`;};
 
 /* expert dashboard */
 SCREENS.expertdash=()=>{const today=state.bookings.filter(b=>b.status==="upcoming");
  return `<div class="view gap-nav"><div class="topbar" style="padding-top:18px"><div class="grow"><div class="tiny dim">Expert mode</div><h2 class="h2">Your dashboard</h2></div><button class="iconbtn" data-go="home">${ic("logout",19)}</button></div>
   <div class="pad"><div class="card" data-stagger style="padding:16px;background:${state.expAvail?'linear-gradient(120deg,var(--green-light),var(--green-mid))':'var(--surface)'}"><div class="between"><div><b>${state.expAvail?"You're available now":"You're offline"}</b><div class="tiny ${state.expAvail?'':'dim'}" style="${state.expAvail?'color:#2c5b30':''}">${state.expAvail?"Visible to people looking for instant help.":"Turn on to receive instant consultations."}</div></div><div class="toggle ${state.expAvail?'on':''}" data-availtoggle></div></div>${state.expAvail?`<div class="wrap" style="margin-top:14px">${[["chat","Chat"],["audio","Audio"],["video","Video"]].map(([k,l])=>`<button class="chip tint ${state.expModes.includes(k)?'on':''}" data-emode="${k}">${l}</button>`).join("")}</div>`:""}</div>
    <div class="wrap" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr">${[["₹18,420","This week","wallet"],["4.9 ★","Rating","star"],["32","Consults","users"],["3","New requests","bell"]].map(([n,l,i])=>`<div class="card" data-stagger style="padding:16px"><div class="dim">${ic(i,18)}</div><div class="num" style="font-size:22px;margin-top:8px">${n}</div><div class="tiny dim">${l}</div></div>`).join("")}</div>
+   ${state.expRequests.length?`<h3 class="h2" style="margin:22px 0 12px" data-stagger>Requests</h3><div class="stack-s">${state.expRequests.map(r=>`<div class="card" data-stagger style="padding:14px"><div class="row" style="margin-bottom:11px"><div style="width:40px;height:40px;border-radius:50%;background:var(--cream);display:grid;place-items:center;color:var(--green-deep)">${ic(r.mode==="video"?"video":r.mode==="audio"?"phone":"chat",18)}</div><div class="grow"><b class="small">${esc(r.topic)}</b><div class="tiny dim">${esc(r.name)} · ${r.mode} · ${r.when}</div></div></div><div class="row" style="gap:8px"><button class="btn btn-primary grow small" data-expreq="accept|${r.id}">Accept</button><button class="btn btn-ghost small" data-expreq="decline|${r.id}">Decline</button></div></div>`).join("")}</div>`:""}
    <h3 class="h2" style="margin:22px 0 12px" data-stagger>Today's consultations</h3><div class="stack-s">${today.map(b=>`<div class="card between" data-stagger style="padding:14px"><div class="row">${ic("clock",17)}<div><b class="small">${b.time} · ${b.dur}</b><div class="tiny dim">${b.mode} · with a member</div></div></div><button class="btn btn-primary small" data-toast="Ready at start time">Join</button></div>`).join("")||'<div class="tiny dim">No sessions today.</div>'}</div>
-   <h3 class="h2" style="margin:22px 0 12px" data-stagger>Manage</h3><div class="card" style="padding:6px 16px">${[["cal","Availability"],["wallet","Earnings & payouts"],["sliders","Services & pricing"],["star","Reviews"]].map(([i,l])=>`<button class="tickrow" data-toast="${l} — demo" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left">${ic(i,17)}<b class="small grow">${l}</b>${ic("chevr",15)}</button>`).join("")}</div><div style="height:22px"></div></div></div>`;};
+   <h3 class="h2" style="margin:22px 0 12px" data-stagger>Manage</h3><div class="card" style="padding:6px 16px">${[["sliders","Services & pricing","services"],["cal","Availability","availability"],["wallet","Earnings & payouts","earnings"],["star","Reviews","reviews"],["user","Preview my public profile","preview"]].map(([i,l,a])=>`<button class="tickrow" data-expmanage="${a}" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left">${ic(i,17)}<b class="small grow">${l}</b>${ic("chevr",15)}</button>`).join("")}</div><div style="height:22px"></div></div></div>`;};
 
 /* expert onboarding */
 const ESTEPS=[
@@ -955,6 +1010,28 @@ function filtersSheet(){const ex=state.explore;
 function sortSheet(){const ex=state.explore;return `<h3 class="h2" style="margin:6px 0 14px">Sort by</h3>${["smart","availability","experience","price","rating"].map(s=>`<button class="card between" data-sort="${s}" style="padding:14px;width:100%;margin-bottom:9px;text-align:left;cursor:pointer"><b class="small">${s[0].toUpperCase()+s.slice(1)}</b>${ex.sort===s?ic("check",18):""}</button>`).join("")}`;}
 function reportSheet(){return `<h3 class="h2" style="margin:6px 0 6px">Report or get help</h3><p class="small muted" style="margin-bottom:14px">Your safety matters.</p>${["Inappropriate behaviour","Misleading credentials","Payment issue","Something felt unsafe","Other"].map(r=>`<button class="card" data-dosreport style="padding:14px;width:100%;text-align:left;margin-bottom:9px;cursor:pointer"><b class="small">${r}</b></button>`).join("")}<div class="divider"></div><button class="btn btn-ghost btn-block" data-doblock>Block this person</button>`;}
 function loginSheet(kind){const ph=kind==="phone";return `<h3 class="h2" style="margin:6px 0 4px">Continue with ${ph?"phone":"email"}</h3><p class="small muted" style="margin-bottom:16px">We'll send a quick code to verify it's you.</p><label class="lbl">${ph?"Phone number":"Email address"}</label><input class="field" id="login-input" placeholder="${ph?'+91 ':''}" inputmode="${ph?'tel':'email'}"><button class="btn btn-primary btn-block btn-lg" style="margin-top:16px" data-dologin>Send code</button>`;}
+function settingsSheet(){const p=state.prefs;return `<h3 class="h2" style="margin:6px 0 16px">Settings</h3>
+ <label class="lbl">Preferred language</label><div class="wrap" style="margin:6px 0 18px">${LANGS.slice(0,5).map(l=>`<button class="chip ${p.lang===l?'on':''}" data-pflang="${l}">${l}</button>`).join("")}</div>
+ <div class="card" style="padding:2px 16px;margin-bottom:14px">
+  <div class="tickrow"><div class="grow"><b class="small">Notifications</b><div class="tiny dim">Session reminders & replies</div></div><div class="toggle ${p.notify?'on':''}" data-pftoggle="notify"></div></div>
+  <div class="tickrow"><div class="grow"><b class="small">Recording consent</b><div class="tiny dim">Allow sessions to be recorded</div></div><div class="toggle ${p.recording?'on':''}" data-pftoggle="recording"></div></div></div>
+ <button class="btn btn-ghost btn-block" data-toast="Privacy controls — demo">${ic("shield",17)} Privacy controls</button>
+ <button class="btn btn-primary btn-block btn-lg" style="margin-top:10px" data-savesettings>Done</button>`;}
+function svcSheet(){return `<h3 class="h2" style="margin:6px 0 6px">Services & pricing</h3><p class="small muted" style="margin-bottom:14px">You set your own prices — adjust with − / +.</p>
+ <div class="stack-s">${state.expServices.map((s,i)=>`<div class="card between" style="padding:13px 15px"><div><b class="small">${esc(s.t)}</b><div class="tiny dim">${s.u?"per minute":"one session"}</div></div><div class="row" style="gap:8px"><button class="iconbtn" data-svc="dec|${i}" style="width:36px;height:36px;font-size:20px;font-weight:700">−</button><b class="num" style="min-width:72px;text-align:center">${rupee(s.p)}${s.u}</b><button class="iconbtn" data-svc="inc|${i}" style="width:36px;height:36px;font-size:18px;font-weight:700">+</button></div></div>`).join("")}</div>
+ <div class="glassnudge" style="padding:12px 14px;margin-top:12px"><div class="tiny dim">Typical for similar experts</div><b class="small">₹600–₹1,200 / session</b></div>
+ <button class="btn btn-primary btn-block btn-lg" style="margin-top:12px" data-closesheet>Save</button>`;}
+function availSheet(){const on=state.expSlots;const slots=["Weekday mornings","Weekday evenings","Weekends","Late night"];
+ return `<h3 class="h2" style="margin:6px 0 12px">Availability</h3><p class="small muted" style="margin-bottom:12px">When are you usually free for scheduled sessions?</p>
+ <div class="wrap">${slots.map(s=>`<button class="chip ${on.includes(s)?'on':''}" data-slottoggle="${esc(s)}">${s}</button>`).join("")}</div>
+ <div class="card between" style="padding:14px;margin-top:16px"><div><b class="small">Allow instant consultations</b><div class="tiny dim">Show as "Available now" when online</div></div><div class="toggle ${state.expAvail?'on':''}" data-availtoggle></div></div>
+ <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" data-closesheet>Done</button>`;}
+function earningsSheet(){return `<h3 class="h2" style="margin:6px 0 12px">Earnings & payouts</h3>
+ <div class="card" style="padding:18px;background:linear-gradient(140deg,var(--green-light),#fff)"><div class="tiny" style="color:#2c5b30;font-weight:600">Available to withdraw</div><div class="num" style="font-size:28px;margin-top:4px">₹18,420</div></div>
+ <div class="card" style="padding:2px 16px;margin-top:14px">${[["This week","₹18,420"],["This month","₹64,900"],["Platform fee (15%)","−₹11,453"],["Lifetime","₹4,12,300"]].map(([l,v])=>`<div class="tickrow"><span class="small grow">${l}</span><b class="num">${v}</b></div>`).join("")}</div>
+ <div class="tiny dim" style="margin:12px 2px">Payouts settle to your bank within 2–3 working days.</div>
+ <button class="btn btn-primary btn-block btn-lg" data-toast="Withdrawal requested 🎉">Withdraw ₹18,420</button>`;}
+function expReviewsSheet(){const e=byId(1);return `<h3 class="h2" style="margin:6px 0 4px">Your reviews</h3><p class="small muted" style="margin-bottom:14px"><b class="num">4.9</b> ${starRow(5)} · 480 reviews</p><div class="stack-s">${e.reviews.concat(e.reviews).slice(0,5).map(r=>`<div class="card" style="padding:14px"><div class="between"><b class="small">${esc(r.name)}</b><span class="tiny dim">${r.when}</span></div><div class="tiny" style="margin:3px 0">${starRow(r.r)}</div><p class="small muted" style="margin:0;line-height:1.5">${esc(r.t)}</p></div>`).join("")}</div>`;}
 function editSheet(){return `<h3 class="h2" style="margin:6px 0 14px">Your profile</h3><label class="lbl">Your name</label><input class="field" id="pf-name" value="${esc(state.user.name==='there'?'':state.user.name)}" placeholder="Your name"><label class="lbl" style="margin-top:14px">What brings you here?</label><div class="wrap" style="margin-top:6px">${INTENTS.map(([e,t])=>`<button class="chip ${state.user.intent===t?'on':''}" data-pfintent="${esc(t)}">${e} ${t}</button>`).join("")}</div><button class="btn btn-primary btn-block btn-lg" style="margin-top:18px" data-saveprofile>Save</button>`;}
 function liveSheet(){const live=(state.liveMatches||[]);return `<h3 class="h2" style="margin:6px 0 4px">${live.length} experts are available</h3><p class="small muted" style="margin-bottom:14px">People who can talk to you right now.</p><div class="stack-s">${live.map(e=>`<button class="card between" data-talk="${e.id}" style="padding:12px;width:100%;text-align:left;cursor:pointer"><div class="row">${avatarEl(e,42)}<div><b class="small">${esc(e.name)}</b><div class="tiny dim">${esc(e.role)} · ${rupee(e.rate)}/min</div></div></div><span class="avail"><span class="dot"></span></span></button>`).join("")}</div>`;}
 function dbReviewSheet(a){return `<h3 class="h2" style="margin:6px 0 4px">${esc(a.name||"New expert")}</h3><div class="badge b-verify" style="margin-bottom:12px">${ic("shield",12)} Live submission · saved to the shared database</div><p class="small muted" style="margin-bottom:14px">${esc(a.role||"Applied via onboarding")}. Your decision persists for everyone.</p><div class="card" style="padding:6px 16px;margin-bottom:14px">${[["Government ID","Uploaded"],["Qualification","Uploaded"],["Experience","Uploaded"],["Status",esc(a.status||"Pending")]].map(([l,v])=>`<div class="tickrow">${ic("doc",16)}<span class="small grow">${l}</span><span class="tiny dim">${v}</span></div>`).join("")}</div><div class="wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="btn btn-primary" data-dbaction="${esc(a.id)}|Approved">Approve</button><button class="btn btn-ghost" data-dbaction="${esc(a.id)}|Needs info">Request info</button><button class="btn btn-ghost" data-dbaction="${esc(a.id)}|Rejected">Reject</button><button class="btn btn-ghost" data-dbaction="${esc(a.id)}|Suspended">Suspend</button></div>`;}
@@ -1009,13 +1086,15 @@ function confirmBooking(){const b=state.booking,e=byId(b.expertId);state.payCtx=
    EVENTS
    ========================================================================== */
 document.addEventListener("click",e=>{
- const t=e.target.closest("[data-back],[data-go],[data-getstarted],[data-onbnext],[data-onbskip],[data-intent],[data-login],[data-dologin],[data-opensearch],[data-sugg],[data-find],[data-match],[data-vert],[data-need],[data-fil],[data-filters],[data-sortopen],[data-sort],[data-apply],[data-expert],[data-talk],[data-talknow],[data-book],[data-service],[data-startmode],[data-accept],[data-cc],[data-endcall],[data-day],[data-slot],[data-dur],[data-confirmbk],[data-paymethod],[data-pay],[data-openchat],[data-send],[data-star],[data-useful],[data-rtag],[data-again],[data-submitreview],[data-bktab],[data-join],[data-reschedule],[data-cancel],[data-doconcancel],[data-summary],[data-rate],[data-become],[data-expnext],[data-expback],[data-availtoggle],[data-emode],[data-adminsec],[data-adminrev],[data-adminaction],[data-dbrev],[data-dbaction],[data-quickask],[data-doquickask],[data-group],[data-reservegroup],[data-guide],[data-report],[data-dosreport],[data-doblock],[data-editprofile],[data-pfintent],[data-saveprofile],[data-logout],[data-toast],[data-noop],[data-closesheet]");
+ const t=e.target.closest("[data-back],[data-go],[data-feedstar],[data-sendfeedback],[data-getstarted],[data-onbnext],[data-onbskip],[data-intent],[data-login],[data-dologin],[data-opensearch],[data-sugg],[data-find],[data-match],[data-vert],[data-need],[data-fil],[data-filters],[data-sortopen],[data-sort],[data-apply],[data-expert],[data-talk],[data-talknow],[data-book],[data-service],[data-startmode],[data-accept],[data-cc],[data-endcall],[data-day],[data-slot],[data-dur],[data-confirmbk],[data-paymethod],[data-pay],[data-openchat],[data-send],[data-star],[data-useful],[data-rtag],[data-again],[data-submitreview],[data-bktab],[data-join],[data-reschedule],[data-cancel],[data-doconcancel],[data-summary],[data-rate],[data-become],[data-expnext],[data-expback],[data-availtoggle],[data-emode],[data-expmanage],[data-svc],[data-slottoggle],[data-expreq],[data-adminsec],[data-adminrev],[data-adminaction],[data-dbrev],[data-dbaction],[data-quickask],[data-doquickask],[data-group],[data-reservegroup],[data-guide],[data-report],[data-dosreport],[data-doblock],[data-editprofile],[data-pfintent],[data-saveprofile],[data-save],[data-settings],[data-pflang],[data-pftoggle],[data-savesettings],[data-logout],[data-toast],[data-noop],[data-closesheet]");
  if(!t)return;const d=t.dataset;haptic(6);
  if("back" in d)return back();
  if(d.go)return go(d.go==="stub"?"stub":d.go);
  if("toast" in d)return toast(d.toast);
  if("noop" in d){t.classList.toggle("on");return;}
  if("closesheet" in d)return closeSheet();
+ if(d.feedstar){state.feed=+d.feedstar;const w=$("#feedstars");if(w)$$("span",w).forEach((s,i)=>{const on=i<state.feed;s.style.color=on?"#F1B33C":"#E5E0D4";s.style.transform="scale("+(on?1.1:1)+")";});return;}
+ if("sendfeedback" in d){const t=$("#feedtext")?.value?.trim();if(!state.feed&&!t){toast("Add a rating or a note first");return;}FDB.addFeedback({stars:state.feed||0,text:t||""});state.feed=0;toast("Thank you — we read every note 💚");renderNow();return;}
  if("getstarted" in d)return go("login");
  if("onbnext" in d){if(state.onb<ONB.length-1){state.onb++;renderNow(true);}else go("login");return;}
  if("onbskip" in d)return go("login");
@@ -1065,7 +1144,11 @@ document.addEventListener("click",e=>{
  if("become" in d){state.expOnb=0;go("expertonboard");return;}
  if("expnext" in d){if(state.expOnb<ESTEPS.length-1){state.expOnb++;renderNow(true);}else{state.isExpert=true;FDB.addApplication({name:state.user.name&&state.user.name!=="there"?state.user.name:"New expert",role:"Applied via onboarding",kind:"expert"});toast("Submitted for verification 🎉");go("expertdash",{replace:true});}return;}
  if("expback" in d){if(state.expOnb>0){state.expOnb--;renderNow(true);}else go("userprofile");return;}
- if("availtoggle" in d){state.expAvail=!state.expAvail;renderNow();if(state.expAvail)toast("You're visible for instant consultations");return;}
+ if("availtoggle" in d){state.expAvail=!state.expAvail;if($("#sheet").classList.contains("show"))openSheet(availSheet());else renderNow();if(state.expAvail)toast("You're visible for instant consultations");return;}
+ if(d.expmanage){const a=d.expmanage;if(a==="services")openSheet(svcSheet());else if(a==="availability")openSheet(availSheet());else if(a==="earnings")openSheet(earningsSheet());else if(a==="reviews")openSheet(expReviewsSheet());else if(a==="preview"){state.expertId=1;go("profile");toast("Preview — how members see you");}return;}
+ if(d.svc){const p=d.svc.split("|"),s=state.expServices[+p[1]],step=s.u?5:50;s.p=Math.max(step,s.p+(p[0]==="inc"?step:-step));store.set("expServices",state.expServices);openSheet(svcSheet());return;}
+ if(d.slottoggle){const i=state.expSlots.indexOf(d.slottoggle);i>=0?state.expSlots.splice(i,1):state.expSlots.push(d.slottoggle);openSheet(availSheet());return;}
+ if(d.expreq){const p=d.expreq.split("|"),idx=state.expRequests.findIndex(r=>r.id===p[1]);if(idx>=0){state.expRequests.splice(idx,1);toast(p[0]==="accept"?"Accepted — connecting…":"Request declined");}renderNow();return;}
  if(d.emode){const i=state.expModes.indexOf(d.emode);i>=0?state.expModes.splice(i,1):state.expModes.push(d.emode);renderNow();return;}
  if(d.adminsec){state.adminSec=d.adminsec;renderNow(true);return;}
  if(d.adminrev!==undefined&&"adminrev" in d){openSheet(adminReviewSheet(ADMINQ[+d.adminrev]));return;}
@@ -1080,6 +1163,11 @@ document.addEventListener("click",e=>{
  if(d.report!==undefined&&"report" in d)return openSheet(reportSheet());
  if("dosreport" in d){closeSheet();toast("Report sent — our team will review");return;}
  if("doblock" in d){closeSheet();toast("Blocked — you won't be matched again");return;}
+ if(d.save){const id=+d.save,i=state.saved.indexOf(id);if(i>=0){state.saved.splice(i,1);toast("Removed from saved");}else{state.saved.unshift(id);toast("Saved 💗");}store.set("saved",state.saved);renderNow();return;}
+ if("settings" in d)return openSheet(settingsSheet());
+ if(d.pflang){state.prefs.lang=d.pflang;store.set("prefs",state.prefs);openSheet(settingsSheet());return;}
+ if(d.pftoggle){state.prefs[d.pftoggle]=!state.prefs[d.pftoggle];store.set("prefs",state.prefs);openSheet(settingsSheet());return;}
+ if("savesettings" in d){closeSheet();toast("Settings saved");return;}
  if("editprofile" in d)return openSheet(editSheet());
  if(d.pfintent){state.user.intent=d.pfintent;openSheet(editSheet());return;}
  if("saveprofile" in d){const n=$("#pf-name")?.value?.trim();if(n)state.user.name=n;store.set("user",state.user);closeSheet();toast("Profile updated");renderNow();return;}
