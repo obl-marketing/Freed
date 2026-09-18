@@ -620,6 +620,7 @@ SCREENS.home=()=>{
         <input id="home-search" placeholder="Tell us what you're looking for..." readonly>
         ${ic("spark",18)}
       </div>
+      ${FDB.ready?`<div class="row" style="gap:7px;margin-top:12px"><span class="dot"></span><span class="tiny" style="color:var(--avail);font-weight:600">Live · ${FDB.store.bookings} session${FDB.store.bookings===1?'':'s'} booked on FREED so far</span></div>`:''}
       <div class="between" style="margin:20px 2px 10px"><span class="t-eyebrow">Or explore</span></div>
     </div>
     <div class="hscroll">${HOME_CHIPS.map(([l,k])=>`<button class="chip green" data-cat="${k}">${l}</button>`).join("")}</div>
@@ -883,6 +884,7 @@ SCREENS.profile_expert=()=>{
 
     <div class="pad" style="margin-top:18px">
       <div class="between" style="margin-bottom:10px"><h3 class="t-h2">Reviews</h3><span class="small">${starRow(e.rating)} <b>${e.rating}</b> · ${e.reviews.length*40} reviews</span></div>
+      ${(function(){const c=FDB.communityFor(e.id);return c?`<div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--cream)"><b class="small">${ic("spark",13)} Live on FREED</b><div class="tiny" style="margin-top:3px;color:#6b6a2c">${starRow(Math.round(c.avg))} ${c.avg.toFixed(1)} · ${c.n} review${c.n>1?'s':''} left by people using this app</div></div>`:'';})()}
       <div class="stack-sm">${e.reviews.map(r=>`
         <div class="card" style="padding:14px">
           <div class="between"><b class="small">${esc(r.name)}</b><span class="tiny muted">${r.when}</span></div>
@@ -1315,7 +1317,14 @@ SCREENS.admin=()=>{
         </div>
         <div class="card" style="padding:16px;margin-top:14px"><b class="small">Consultations this week</b><div style="display:flex;align-items:flex-end;gap:8px;height:110px;margin-top:14px">${[40,62,50,78,95,70,88].map(h=>`<div style="flex:1;background:linear-gradient(var(--green-mid),var(--green-light));height:${h}%;border-radius:8px 8px 0 0"></div>`).join("")}</div><div class="between tiny muted" style="margin-top:8px">${["M","T","W","T","F","S","S"].map(d=>`<span>${d}</span>`).join("")}</div></div>
       `:sec==="Verification"?`
-        <div class="tiny muted" style="margin-bottom:10px">${ADMIN_QUEUE.filter(a=>a.status!=='Verified').length} awaiting review</div>
+        ${FDB.store.apps.length?`
+        <div class="tiny" style="margin-bottom:8px;color:var(--avail)">${ic("shield",12)} ${FDB.store.apps.filter(a=>a.status==='Pending').length} live submission${FDB.store.apps.filter(a=>a.status==='Pending').length!==1?'s':''} from this app · syncs across everyone</div>
+        <div class="stack-sm" style="margin-bottom:16px">${FDB.store.apps.map(a=>`
+          <button class="card" data-dbrev="${esc(a.id)}" style="padding:14px;width:100%;text-align:left;cursor:pointer;border-color:var(--green-mid)">
+            <div class="between"><div><b class="small">${esc(a.name||'New expert')}</b><div class="tiny muted">${esc(a.role||'Applied via onboarding')}</div></div>
+            <span class="badge ${(a.status==='Verified'||a.status==='Approved')?'badge-verify':a.status==='Rejected'?'badge-gray':'badge-cream'}">${esc(a.status||'Pending')}</span></div>
+          </button>`).join("")}</div>`:(FDB.ready?`<div class="tiny muted" style="margin-bottom:14px">${ic("info",12)} No live submissions yet — complete Expert onboarding to see one appear here in real time.</div>`:'')}
+        <div class="tiny muted" style="margin-bottom:10px">Demo queue · ${ADMIN_QUEUE.filter(a=>a.status!=='Verified').length} awaiting review</div>
         <div class="stack-sm">${ADMIN_QUEUE.map((a,i)=>`
           <button class="card" data-adminrev="${i}" style="padding:14px;width:100%;text-align:left;cursor:pointer">
             <div class="between"><div><b class="small">${esc(a.name)}</b><div class="tiny muted">${esc(a.role)}</div></div>
@@ -1488,7 +1497,7 @@ function confirmBooking(){
    EVENT DELEGATION
    ========================================================================== */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-back],[data-go],[data-onb-next],[data-onb-skip],[data-login],[data-do-login],[data-open-search],[data-sugg],[data-find],[data-match],[data-cat],[data-need],[data-fil],[data-filters],[data-sortopen],[data-sort],[data-apply-filters],[data-expert],[data-talk],[data-talk-now],[data-book],[data-service],[data-startmode],[data-accept],[data-cc],[data-endcall],[data-day],[data-slot],[data-dur],[data-confirm-booking],[data-paymethod],[data-pay],[data-open-chat],[data-send],[data-star],[data-useful],[data-rtag],[data-again],[data-submit-review],[data-bktab],[data-join],[data-reschedule],[data-cancel],[data-doconcancel],[data-summary],[data-rate],[data-become-expert],[data-exp-next],[data-exp-back],[data-avail-toggle],[data-emode],[data-adminsec],[data-adminrev],[data-adminaction],[data-report],[data-dosreport],[data-doblock],[data-edit-profile],[data-pfrole],[data-save-profile],[data-logout],[data-toast],[data-noop],[data-close-sheet],[data-become]");
+  const t=e.target.closest("[data-back],[data-go],[data-onb-next],[data-onb-skip],[data-login],[data-do-login],[data-open-search],[data-sugg],[data-find],[data-match],[data-cat],[data-need],[data-fil],[data-filters],[data-sortopen],[data-sort],[data-apply-filters],[data-expert],[data-talk],[data-talk-now],[data-book],[data-service],[data-startmode],[data-accept],[data-cc],[data-endcall],[data-day],[data-slot],[data-dur],[data-confirm-booking],[data-paymethod],[data-pay],[data-open-chat],[data-send],[data-star],[data-useful],[data-rtag],[data-again],[data-submit-review],[data-bktab],[data-join],[data-reschedule],[data-cancel],[data-doconcancel],[data-summary],[data-rate],[data-become-expert],[data-exp-next],[data-exp-back],[data-avail-toggle],[data-emode],[data-adminsec],[data-adminrev],[data-adminaction],[data-dbrev],[data-dbaction],[data-report],[data-dosreport],[data-doblock],[data-edit-profile],[data-pfrole],[data-save-profile],[data-logout],[data-toast],[data-noop],[data-close-sheet],[data-become]");
   if(!t)return;
   const d=t.dataset;
 
@@ -1553,6 +1562,7 @@ document.addEventListener("click",e=>{
       const pb=state.pendingBooking;const kind=state.payCtx.kind;
       if(kind==="booking"||( state.payCtx.sub)){ if(pb&&pb.date&&pb.date!=="To be scheduled"){state.bookings.unshift({id:"b"+Date.now(),expertId:pb.expertId,date:pb.date,time:pb.time,dur:pb.dur,amount:pb.amount,status:"upcoming",mode:state.consult?.mode||"video"});}}
       state.lastBooking=Object.assign({kind:pb&&pb.date&&pb.date!=="To be scheduled"?"booking":"service"},pb);
+      FDB.addBooking({expertId:pb&&pb.expertId,amount:state.payTotal||(pb&&pb.amount)||0});
       go("confirmed",{replace:true});
     },1600);return;}
 
@@ -1565,7 +1575,7 @@ document.addEventListener("click",e=>{
   if(d.useful){state.review.useful=d.useful;render();return;}
   if(d.rtag){const arr=state.review.tags;const i=arr.indexOf(d.rtag);i>=0?arr.splice(i,1):arr.push(d.rtag);render();return;}
   if(d.again){state.review.again=d.again;render();return;}
-  if("submitReview" in d){const b=state.bookings.find(x=>x.expertId===(state.reviewExpertId)&&x.status==="past");if(b)b.rated=true;toast("Thanks for your feedback");go("summary",{replace:true});return;}
+  if("submitReview" in d){const r=state.review||{};FDB.addReview({expertId:state.reviewExpertId,stars:r.stars||0,tags:r.tags||[],again:r.again||null,useful:r.useful||null});const b=state.bookings.find(x=>x.expertId===(state.reviewExpertId)&&x.status==="past");if(b)b.rated=true;toast("Thanks for your feedback");go("summary",{replace:true});return;}
 
   /* bookings */
   if(d.bktab){state.bkTab=d.bktab;render();return;}
@@ -1578,7 +1588,7 @@ document.addEventListener("click",e=>{
 
   /* expert mode */
   if("becomeExpert" in d||"become" in d){state.expOnbStep=0;go("expertonboard");return;}
-  if("expNext" in d){if(state.expOnbStep<EXP_STEPS.length-1){state.expOnbStep++;render();}else{state.isExpert=true;toast("Submitted for verification 🎉");go("expertdash",{replace:true});}return;}
+  if("expNext" in d){if(state.expOnbStep<EXP_STEPS.length-1){state.expOnbStep++;render();}else{state.isExpert=true;FDB.addApplication({name:state.user.name&&state.user.name!=="there"?state.user.name:"New expert",role:"Applied via onboarding",kind:"expert"});toast("Submitted for verification 🎉");go("expertdash",{replace:true});}return;}
   if("expBack" in d){if(state.expOnbStep>0){state.expOnbStep--;render();}else{go("profile");}return;}
   if("availToggle" in d){state.expertAvailable=!state.expertAvailable;render();if(state.expertAvailable)toast("You're visible for instant consultations");return;}
   if(d.emode){const i=state.expertModes.indexOf(d.emode);i>=0?state.expertModes.splice(i,1):state.expertModes.push(d.emode);render();return;}
@@ -1586,6 +1596,8 @@ document.addEventListener("click",e=>{
   /* admin */
   if(d.adminsec){state.adminSec=d.adminsec;render();return;}
   if(d.adminrev!==undefined&&"adminrev" in d){const a=ADMIN_QUEUE[+d.adminrev];openSheet(adminReviewSheet(a));return;}
+  if(d.dbrev){const a=FDB.store.apps.find(x=>x.id===d.dbrev);if(a)openSheet(dbReviewSheet(a));return;}
+  if(d.dbaction){const parts=d.dbaction.split("|");FDB.setAppStatus(parts[0],parts[1]);closeSheet();toast("Application "+parts[1].toLowerCase());return;}
   if(d.adminaction){toast(d.adminaction);closeSheet();return;}
 
   /* report / safety */
@@ -1608,6 +1620,20 @@ function openLiveSheet(){
         <div class="row">${avatarEl(e,42)}<div><b class="small">${esc(e.name)}</b><div class="tiny muted">${esc(e.role)} · ${rupee(e.rate)}/min</div></div></div>
         <span class="avail-line"><span class="dot"></span></span>
       </button>`).join("")}</div>`);
+}
+function dbReviewSheet(a){
+  return `<h3 class="t-h2" style="margin:6px 0 4px">${esc(a.name||'New expert')}</h3>
+    <div class="badge badge-verify" style="margin-bottom:12px">${ic("shield",12)} Live submission · saved to the shared database</div>
+    <p class="small muted" style="margin-bottom:14px">${esc(a.role||'Applied via onboarding')}. Your decision persists and updates for everyone viewing the admin panel.</p>
+    <div class="card" style="padding:6px 16px;margin-bottom:14px">
+      ${[["Government ID","Uploaded"],["Qualification","Uploaded"],["Experience proof","Uploaded"],["Status",esc(a.status||'Pending')]].map(([l,v])=>`<div class="checkline">${ic("doc",16)}<span class="small grow">${l}</span><span class="tiny muted">${v}</span></div>`).join("")}
+    </div>
+    <div class="wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+      <button class="btn btn-primary" data-dbaction="${esc(a.id)}|Approved">Approve</button>
+      <button class="btn btn-ghost" data-dbaction="${esc(a.id)}|Needs info">Request info</button>
+      <button class="btn btn-ghost" data-dbaction="${esc(a.id)}|Rejected">Reject</button>
+      <button class="btn btn-ghost" data-dbaction="${esc(a.id)}|Suspended">Suspend</button>
+    </div>`;
 }
 function adminReviewSheet(a){
   return `<h3 class="t-h2" style="margin:6px 0 4px">${esc(a.name)}</h3><p class="small muted" style="margin-bottom:14px">${esc(a.role)}</p>
@@ -1640,8 +1666,47 @@ function bindRipples(){
 /* ==========================================================================
    BOOT
    ========================================================================== */
+/* ==========================================================================
+   LIVE DATABASE — claude.use('db'). Real shared store: applications, reviews
+   and bookings persist and sync live across everyone who opens this page.
+   Degrades gracefully to in-memory when unavailable (e.g. opened as a file).
+   ========================================================================== */
+const FDB=(function(){
+  let db=null, isReady=false;
+  const store={apps:[], reviewAgg:{}, bookings:0};
+  const reRender=screens=>{ if(screens.indexOf(state.screen)>=0) render(); };
+  async function init(){
+    try{
+      if(!(window.claude&&window.claude.use))return;
+      const d=await window.claude.use("db");
+      if(!d)return;
+      db=d; isReady=true;
+      db.collection("applications").orderBy("createdAt","desc").limit(50).onSnapshot(snap=>{
+        store.apps=snap.docs.map(x=>({id:x.id,...(x.data()||{})}));
+        reRender(["admin"]);
+      },()=>{});
+      db.collection("reviews").orderBy("createdAt","desc").limit(300).onSnapshot(snap=>{
+        const agg={};
+        snap.docs.forEach(x=>{const r=x.data()||{};const e=r.expertId;if(e==null)return;(agg[e]=agg[e]||{sum:0,n:0});agg[e].sum+=Number(r.stars)||0;agg[e].n++;});
+        store.reviewAgg=agg; reRender(["profile_expert","home"]);
+      },()=>{});
+      db.collection("bookings").limit(1000).onSnapshot(snap=>{ store.bookings=snap.size; reRender(["home"]); },()=>{});
+    }catch(e){/* degrade silently */}
+  }
+  const add=(coll,body)=>{ if(!db)return; try{ db.collection(coll).doc().set({...body,createdAt:Date.now()}).catch(()=>{}); }catch(e){} };
+  return {
+    init, store, get ready(){return isReady;},
+    addApplication:a=>add("applications",{...a,status:"Pending"}),
+    setAppStatus:(id,status)=>{ if(!db)return; try{ db.doc("applications/"+id).update({status}).catch(()=>{}); }catch(e){} },
+    addReview:r=>add("reviews",r),
+    addBooking:b=>add("bookings",b),
+    communityFor:id=>{ const a=store.reviewAgg[id]; return (a&&a.n)?{avg:a.sum/a.n,n:a.n}:null; },
+  };
+})();
+
 function boot(){
   render();
+  FDB.init();
   setTimeout(()=>{if(state.screen==="splash"){state.onbStep=0;go("onboarding",{replace:true});}},2200);
 }
 boot();
